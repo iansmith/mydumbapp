@@ -44,18 +44,25 @@ func domReady() {
 	NewDumbLeaf(parent, "4169e1", 10, 20, 40, 50)   //royalblue
 	NewDumbLeaf(parent, "1e90ff", 120, 130, 20, 60) //dodgerblue
 
+	//porthole with a child that is read
 	porthole := NewPorthole(parent)
-
 	NewDumbLeaf(porthole, "cd5c5c", 0, 0, portholeWidth, portholeWidth)
 
-	//force a drawing pass
-	root.(*std.RootInteractor).Draw()
+	//random trivial children
+	NewTrivialLeaf(parent, 275, 2, 32, 32)
 
+	//force a drawing pass
+	root.Draw()
+
+	//in the background, process things coming through the channel
+	//this is the event stream, but it's useful to select on other
+	//things as well, like timers, network data, etc
 	go func() {
 		for {
 			select {
-			case <-ch:
-
+			case event := <-ch:
+				std.MousePolicy.Process(event, root)
+				root.Draw()
 			}
 		}
 	}()
@@ -83,6 +90,9 @@ func (d *DumbParent) DrawSelf(c tropical.Canvas) {
 	c.Save()
 	c.SetFillColor("#cdc8b1") //cornsilk3
 	c.FillRectangle(0, 0, d.Width()/2, d.Height()/2)
+	c.SetStrokeColor("#cdc8b1")
+	c.Rectangle(0, 0, d.Width(), d.Height())
+	c.Stroke()
 	std.Default.DrawChildren(d, c)
 	c.Restore()
 }
@@ -92,14 +102,16 @@ func (d *DumbParent) DrawSelf(c tropical.Canvas) {
 // covered.
 //
 type DumbLeaf struct {
-	fillColor                string
+	stroke                   bool
+	color                    string
 	tropical.Coords          //implementation => std.Coords
 	tropical.TreeManipulator //implementation => std.TreeManipulator
 }
 
-func NewDumbLeaf(parent tropical.Interactor, fillColor string, x, y, w, h int) *DumbLeaf {
+func NewDumbLeaf(parent tropical.Interactor, color string, x, y, w, h int) *DumbLeaf {
 	result := &DumbLeaf{
-		fillColor:       fillColor,
+		color:           color,
+		stroke:          false,
 		Coords:          std.NewCoords(x, y, w, h), //set w and h
 		TreeManipulator: std.NewTreeManipulator(parent),
 	}
@@ -108,13 +120,33 @@ func NewDumbLeaf(parent tropical.Interactor, fillColor string, x, y, w, h int) *
 }
 
 func (d *DumbLeaf) DrawSelf(c tropical.Canvas) {
-	c.SetFillColor(d.fillColor)
-	c.FillRectangle(0, 0, d.Width(), d.Height())
+	if d.stroke {
+		c.SetStrokeColor(d.color)
+		c.Rectangle(0, 0, d.Width(), d.Height())
+		c.Stroke()
+	} else {
+		c.SetFillColor(d.color)
+		c.FillRectangle(0, 0, d.Width(), d.Height())
+	}
+}
+
+func (d *DumbLeaf) MouseDown(event tropical.Event) {
+	//print("down", event.X(), event.Y())
+}
+func (d *DumbLeaf) MouseMove(event tropical.Event) {
+	//print("move",event.X(), event.Y())
+}
+func (d *DumbLeaf) MouseUp(event tropical.Event) {
+	if event.X() < 0 || event.Y() < 0 || event.X() >= d.Width() || event.Y() >= d.Height() {
+		return
+	}
+	print("toggling!")
+	d.stroke = !d.stroke
 }
 
 //
 // Porthole is a parent that expects to have one child. It masks its child
-// with a circle.
+// with a circle. Width and Height are == and set to portholeWidth
 //
 
 type Porthole struct {
@@ -140,4 +172,51 @@ func (p *Porthole) DrawSelf(c tropical.Canvas) {
 	//now just call the default for our child
 	std.Default.DrawChildren(p, c)
 	c.Restore()
+}
+
+//
+// Have to compensate for the porthole effect when picking.
+//
+func (p *Porthole) PickSelf(e tropical.Event, pl tropical.PickList) bool {
+	centerX := e.X() - (p.Width() / 2)
+	centerY := e.Y() - (p.Width() / 2) //has to be square!
+	dist := int(math.Floor(math.Sqrt(float64(centerX*centerX) + float64(centerY*centerY))))
+	if dist > p.Width()/2 {
+		return false
+	}
+	//inside our hole
+	if len(p.Children()) > 0 {
+		child := p.Children()[0]
+		e.Translate(child.X(), child.Y())
+		picks, ok := child.(tropical.PicksSelf)
+		if !ok {
+			std.Default.PickSelf(child, e, pl)
+		} else {
+			picks.PickSelf(e, pl)
+		}
+		e.Translate(-child.X(), -child.Y())
+	}
+
+	if pl != nil {
+		pl.AddHit(p)
+	}
+	return true
+}
+
+//
+// TrivialLeaf is the smallest leaf possible, code-size-wise.  It will get the
+// default drawing behavior.
+//
+type TrivialLeaf struct {
+	tropical.Coords          //implementation => std.Coords
+	tropical.TreeManipulator //implementation => std.TreeManipulator
+}
+
+func NewTrivialLeaf(parent tropical.Interactor, x, y, w, h int) tropical.Interactor {
+	result := &TrivialLeaf{
+		Coords:          std.NewCoords(x, y, w, h),
+		TreeManipulator: std.NewTreeManipulator(parent),
+	}
+	parent.AppendChild(result)
+	return result
 }
