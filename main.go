@@ -33,7 +33,7 @@ func domReady() {
 	std.Default.DrawSelf = DebugDrawSelf
 
 	//hook to web page
-	root := std.NewRootInteractor("canvas", "#f0fff0", nil) //honeydew for root
+	root, ch := std.NewRootInteractor("canvas", "#f0fff0", nil) //honeydew for root
 	//root here can be treated two ways here, as a tropical.Interactor or as a
 	//std.RootInteractor depending on how you want to think of it.  It is
 	//goish to use the baz.(foo).bar() notation to access the method bar
@@ -50,6 +50,15 @@ func domReady() {
 
 	//force a drawing pass
 	root.(*std.RootInteractor).Draw()
+
+	go func() {
+		for {
+			select {
+			case <-ch:
+
+			}
+		}
+	}()
 }
 
 //
