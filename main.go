@@ -269,6 +269,5 @@ func NewIconLeaf(parent tropical.Interactor, x, y, w, h int, htmlId string, offX
 }
 
 func (i *IconLeaf) DrawSelf(c tropical.Canvas) {
-	print("draw self of icon leaf!")
 	c.DrawImageById(i.htmlId, i.imageOffsetX, i.imageOffsetY)
 }
