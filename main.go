@@ -60,7 +60,7 @@ func domReady() {
 
 	//porthole with a child that is read
 	porthole := NewPorthole(parent)
-	NewDumbLeaf(porthole, "#cd5c5c", 0, 0, portholeWidth, portholeWidth)
+	NewIconLeaf(porthole, 0, 0, portholeWidth, portholeWidth, "hudson", 0, 0)
 
 	//random trivial children
 	NewTrivialLeaf(parent, 275, 2, 32, 32)
@@ -243,4 +243,32 @@ func NewTrivialLeaf(parent tropical.Interactor, x, y, w, h int) tropical.Interac
 	}
 	parent.AppendChild(result)
 	return result
+}
+
+//
+// Icon pulls an image from the page and always draws it at the same location
+// within itself.
+//
+type IconLeaf struct {
+	tropical.Coords            //implementation => std.Coords
+	tropical.TreeManipulator   //implementation => std.TreeManipulator
+	htmlId                     string
+	imageOffsetX, imageOffsetY int
+}
+
+func NewIconLeaf(parent tropical.Interactor, x, y, w, h int, htmlId string, offX, offY int) tropical.Interactor {
+	result := &IconLeaf{
+		Coords:          std.NewCoords(x, y, w, h),
+		TreeManipulator: std.NewTreeManipulator(parent),
+		htmlId:          htmlId,
+		imageOffsetX:    offX,
+		imageOffsetY:    offY,
+	}
+	parent.AppendChild(result)
+	return result
+}
+
+func (i *IconLeaf) DrawSelf(c tropical.Canvas) {
+	print("draw self of icon leaf!")
+	c.DrawImageById(i.htmlId, i.imageOffsetX, i.imageOffsetY)
 }
