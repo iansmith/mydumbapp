@@ -12,11 +12,25 @@ import (
 
 var portholeWidth = 80
 
-//draw a red X through any interactor that doesn't implement its own drawing function
+//
+//This demonstrates how to override the "default" behavior for the entire system.
+//
+//Draw a black X through any interactor that doesn't implement its own drawing function.
 func DebugDrawSelf(i tropical.Interactor, canvas tropical.Canvas) {
-	canvas.SetStrokeColor("cd5c5c")
-	canvas.DrawLine(i.X(), i.Y(), i.Width(), i.Height())
+	canvas.Save()
+	canvas.SetStrokeColor("#000000")
+	w := i.Width()
+	h := i.Height()
+	canvas.Rectangle(i.X(), i.Y(), w, h)
 	canvas.Stroke()
+	canvas.MoveTo(0, 0)
+	canvas.LineTo(w, h)
+	canvas.Stroke()
+	canvas.MoveTo(w, 0)
+	canvas.LineTo(0, h)
+	canvas.Stroke()
+	canvas.Restore()
+
 }
 
 //this can called BEFORE the dom is finished loading.  this is a good place
@@ -41,15 +55,16 @@ func domReady() {
 	//As a side effect of this new call, the dumb
 	parent := NewDumbParent(root.(*std.RootInteractor))
 
-	NewDumbLeaf(parent, "4169e1", 10, 20, 40, 50)   //royalblue
-	NewDumbLeaf(parent, "1e90ff", 120, 130, 20, 60) //dodgerblue
+	NewDumbLeaf(parent, "#4169e1", 10, 20, 40, 50)   //royalblue
+	NewDumbLeaf(parent, "#1e90ff", 120, 130, 20, 60) //dodgerblue
 
 	//porthole with a child that is read
 	porthole := NewPorthole(parent)
-	NewDumbLeaf(porthole, "cd5c5c", 0, 0, portholeWidth, portholeWidth)
+	NewDumbLeaf(porthole, "#cd5c5c", 0, 0, portholeWidth, portholeWidth)
 
 	//random trivial children
 	NewTrivialLeaf(parent, 275, 2, 32, 32)
+	NewTrivialLeaf(parent, 270, 260, 32, 32)
 
 	//force a drawing pass
 	root.Draw()
@@ -61,7 +76,7 @@ func domReady() {
 		for {
 			select {
 			case event := <-ch:
-				std.MousePolicy.Process(event, root)
+				std.MouseDispatch.Process(event, root)
 				root.Draw()
 			}
 		}
@@ -130,17 +145,7 @@ func (d *DumbLeaf) DrawSelf(c tropical.Canvas) {
 	}
 }
 
-func (d *DumbLeaf) MouseDown(event tropical.Event) {
-	//print("down", event.X(), event.Y())
-}
-func (d *DumbLeaf) MouseMove(event tropical.Event) {
-	//print("move",event.X(), event.Y())
-}
-func (d *DumbLeaf) MouseUp(event tropical.Event) {
-	if event.X() < 0 || event.Y() < 0 || event.X() >= d.Width() || event.Y() >= d.Height() {
-		return
-	}
-	print("toggling!")
+func (d *DumbLeaf) Click() {
 	d.stroke = !d.stroke
 }
 
@@ -152,6 +157,7 @@ func (d *DumbLeaf) MouseUp(event tropical.Event) {
 type Porthole struct {
 	tropical.Coords          //implementation => std.Coords
 	tropical.TreeManipulator //implementation => std.SingleChild
+	startDragX, startDragY   int
 }
 
 func NewPorthole(parent tropical.Interactor) *Porthole {
@@ -174,6 +180,18 @@ func (p *Porthole) DrawSelf(c tropical.Canvas) {
 	c.Restore()
 }
 
+func (p *Porthole) DragStart() {
+	p.startDragX = p.X()
+	p.startDragY = p.Y()
+}
+func (p *Porthole) DragEnd() {
+}
+
+func (p *Porthole) Drag(x, y int) {
+	p.SetX(p.startDragX + x)
+	p.SetY(p.startDragY + y)
+}
+
 //
 // Have to compensate for the porthole effect when picking.
 //
@@ -184,8 +202,12 @@ func (p *Porthole) PickSelf(e tropical.Event, pl tropical.PickList) bool {
 	if dist > p.Width()/2 {
 		return false
 	}
-	//inside our hole
-	if len(p.Children()) > 0 {
+	//
+	//this code, if uncommented, will pick children that are inside our hole
+	//but we have turned it off because we want to drag _any_ children
+	//that we have and NOT engage their picking at all.
+	//
+	/*if len(p.Children()) > 0 {
 		child := p.Children()[0]
 		e.Translate(child.X(), child.Y())
 		picks, ok := child.(tropical.PicksSelf)
@@ -196,7 +218,9 @@ func (p *Porthole) PickSelf(e tropical.Event, pl tropical.PickList) bool {
 		}
 		e.Translate(-child.X(), -child.Y())
 	}
+	*/
 
+	//add ourself to the picklist, if this was not called just as a test of coords
 	if pl != nil {
 		pl.AddHit(p)
 	}
@@ -205,7 +229,7 @@ func (p *Porthole) PickSelf(e tropical.Event, pl tropical.PickList) bool {
 
 //
 // TrivialLeaf is the smallest leaf possible, code-size-wise.  It will get the
-// default drawing behavior.
+// default drawing behavior, which in this app is defined in DebugDrawSelf.
 //
 type TrivialLeaf struct {
 	tropical.Coords          //implementation => std.Coords

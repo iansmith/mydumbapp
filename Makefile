@@ -13,6 +13,6 @@ HTML_DIR:=../iansmith.github.io/tropical
 
 build:
 	gopherjs install github.com/iansmith/mydumbapp
-	cp $(GOPATH)/bin/mydumbapp.js ../iansmith.github.io/tropical
-	cp $(GOPATH)/bin/mydumbapp.js.map ../iansmith.github.io/tropical
+	cp $(GOPATH)/bin/mydumbapp.js $(HTML_DIR)
+	cp $(GOPATH)/bin/mydumbapp.js.map $(HTML_DIR)
 
